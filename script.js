@@ -48,10 +48,34 @@ const pollState = {
     { id: "no", label: "No" },
     { id: "unsure", label: "Unsure" }
   ],
-  voteKey: "trumpsdeadline-poll-vote-v1",
-  resultsKey: "trumpsdeadline-poll-results-v1"
+  voteKey: "trumpsdeadline-poll-vote-v1"
 };
 
+/* ── Firebase config ── */
+const firebaseConfig = {
+  apiKey: "AIzaSyChcvvKYJJ0TzbyWHNEdGbcy8kjG2LoQU0",
+  authDomain: "deadlinepoll12345.firebaseapp.com",
+  databaseURL: "https://deadlinepoll12345-default-rtdb.firebaseio.com",
+  projectId: "deadlinepoll12345",
+  storageBucket: "deadlinepoll12345.firebasestorage.app",
+  messagingSenderId: "957245435448",
+  appId: "1:957245435448:web:d4ff6a11b83406d250c0cd"
+};
+
+/* ── Firebase helpers (using REST + compat CDN loaded in HTML) ── */
+let firebaseApp;
+let firebaseDb;
+
+function initFirebase() {
+  firebaseApp = firebase.initializeApp(firebaseConfig);
+  firebaseDb = firebase.database();
+}
+
+function getPollRef() {
+  return firebaseDb.ref("poll");
+}
+
+/* ── DOM refs ── */
 const elements = {
   days: document.getElementById("days"),
   hours: document.getElementById("hours"),
@@ -68,6 +92,7 @@ const elements = {
   pollResults: document.getElementById("poll-results")
 };
 
+/* ── Formatting helpers ── */
 function formatInTimeZone(dateInput, timeZone, options = {}) {
   const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
   return new Intl.DateTimeFormat("en-US", {
@@ -91,22 +116,23 @@ function formatClockLabel(dateInput) {
   }).format(new Date(dateInput));
 }
 
+/* ── Deadline / updates / timeline ── */
 function setDeadlineMeta() {
-  elements.deadlineReference.textContent = `Deadline reference: ${formatInTimeZone(deadlineConfig.targetDate, deadlineConfig.timezone)}`;
-  elements.deadlineLocal.textContent = `Your local time: ${new Intl.DateTimeFormat(undefined, {
+  elements.deadlineReference.textContent = "Deadline reference: " + formatInTimeZone(deadlineConfig.targetDate, deadlineConfig.timezone);
+  elements.deadlineLocal.textContent = "Your local time: " + new Intl.DateTimeFormat(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
     timeZoneName: "short"
-  }).format(new Date(deadlineConfig.targetDate))}`;
+  }).format(new Date(deadlineConfig.targetDate));
 }
 
 function setLastUpdated() {
-  const newestUpdate = updatesData
+  var newestUpdate = updatesData
     .slice()
-    .sort((a, b) => new Date(b.isoTime) - new Date(a.isoTime))[0];
+    .sort(function (a, b) { return new Date(b.isoTime) - new Date(a.isoTime); })[0];
 
   elements.lastUpdated.textContent = newestUpdate
     ? formatInTimeZone(newestUpdate.isoTime, deadlineConfig.timezone)
@@ -118,9 +144,9 @@ function padValue(value) {
 }
 
 function updateCountdown() {
-  const now = Date.now();
-  const target = new Date(deadlineConfig.targetDate).getTime();
-  const difference = target - now;
+  var now = Date.now();
+  var target = new Date(deadlineConfig.targetDate).getTime();
+  var difference = target - now;
 
   if (difference <= 0) {
     elements.days.textContent = "00";
@@ -132,131 +158,133 @@ function updateCountdown() {
     return;
   }
 
-  const totalSeconds = Math.floor(difference / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
+  var totalSeconds = Math.floor(difference / 1000);
+  var days = Math.floor(totalSeconds / 86400);
+  var hours = Math.floor((totalSeconds % 86400) / 3600);
+  var minutes = Math.floor((totalSeconds % 3600) / 60);
+  var seconds = totalSeconds % 60;
 
   elements.days.textContent = padValue(days);
   elements.hours.textContent = padValue(hours);
   elements.minutes.textContent = padValue(minutes);
   elements.seconds.textContent = padValue(seconds);
-  elements.countdownStatus.textContent = `Monitoring the reported countdown toward ${formatClockLabel(deadlineConfig.targetDate)} in Washington.`;
+  elements.countdownStatus.textContent = "Monitoring the reported countdown toward " + formatClockLabel(deadlineConfig.targetDate) + " in Washington.";
 }
 
 function renderUpdates() {
-  const sortedUpdates = updatesData
+  var sortedUpdates = updatesData
     .slice()
-    .sort((a, b) => new Date(b.isoTime) - new Date(a.isoTime));
+    .sort(function (a, b) { return new Date(b.isoTime) - new Date(a.isoTime); });
 
   elements.updatesList.innerHTML = sortedUpdates
-    .map((item) => `
-      <article class="update-card">
-        <p class="update-time">${formatClockLabel(item.isoTime)}</p>
-        <h3>${item.title}</h3>
-        <p class="update-summary">${item.summary}</p>
-      </article>
-    `)
+    .map(function (item) {
+      return '<article class="update-card">' +
+        '<p class="update-time">' + formatClockLabel(item.isoTime) + '</p>' +
+        '<h3>' + item.title + '</h3>' +
+        '<p class="update-summary">' + item.summary + '</p>' +
+        '</article>';
+    })
     .join("");
 }
 
 function renderTimeline() {
-  const sortedTimeline = timelineData
+  var sortedTimeline = timelineData
     .slice()
-    .sort((a, b) => new Date(a.isoTime) - new Date(b.isoTime));
+    .sort(function (a, b) { return new Date(a.isoTime) - new Date(b.isoTime); });
 
   elements.timelineList.innerHTML = sortedTimeline
-    .map((item) => `
-      <article class="timeline-item">
-        <p class="timeline-time">${formatInTimeZone(item.isoTime, deadlineConfig.timezone, {
+    .map(function (item) {
+      return '<article class="timeline-item">' +
+        '<p class="timeline-time">' + formatInTimeZone(item.isoTime, deadlineConfig.timezone, {
           month: "short",
           day: "numeric",
           hour: "numeric",
           minute: "2-digit",
           timeZoneName: "short"
-        })}</p>
-        <h3>${item.title}</h3>
-        <p class="timeline-summary">${item.summary}</p>
-      </article>
-    `)
+        }) + '</p>' +
+        '<h3>' + item.title + '</h3>' +
+        '<p class="timeline-summary">' + item.summary + '</p>' +
+        '</article>';
+    })
     .join("");
 }
 
-function getStoredResults() {
-  const emptyResults = pollState.options.reduce((accumulator, option) => {
-    accumulator[option.id] = 0;
-    return accumulator;
-  }, {});
-
-  try {
-    const saved = window.localStorage.getItem(pollState.resultsKey);
-    return saved ? { ...emptyResults, ...JSON.parse(saved) } : emptyResults;
-  } catch (error) {
-    return emptyResults;
-  }
-}
-
-function saveResults(results) {
-  window.localStorage.setItem(pollState.resultsKey, JSON.stringify(results));
-}
-
+/* ── Poll (Firebase-backed) ── */
 function getSavedVote() {
   return window.localStorage.getItem(pollState.voteKey);
 }
 
-function renderPoll() {
-  const results = getStoredResults();
-  const savedVote = getSavedVote();
-  const totalVotes = Object.values(results).reduce((sum, value) => sum + value, 0);
+function renderPollWithData(results) {
+  var totalVotes = 0;
+  pollState.options.forEach(function (opt) {
+    totalVotes += (results[opt.id] || 0);
+  });
+
+  var savedVote = getSavedVote();
 
   elements.pollResults.innerHTML = pollState.options
-    .map((option) => {
-      const count = results[option.id] || 0;
-      const percentage = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
-      return `
-        <div class="poll-result-row">
-          <div class="poll-result-meta">
-            <span>${option.label}</span>
-            <span>${percentage}%</span>
-          </div>
-          <div class="poll-result-bar" aria-hidden="true">
-            <div class="poll-result-fill" style="width: ${percentage}%"></div>
-          </div>
-        </div>
-      `;
+    .map(function (option) {
+      var count = results[option.id] || 0;
+      var percentage = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+      return '<div class="poll-result-row">' +
+        '<div class="poll-result-meta">' +
+        '<span>' + option.label + '</span>' +
+        '<span>' + percentage + '%</span>' +
+        '</div>' +
+        '<div class="poll-result-bar" aria-hidden="true">' +
+        '<div class="poll-result-fill" style="width: ' + percentage + '%"></div>' +
+        '</div>' +
+        '</div>';
     })
     .join("");
 
-  const buttons = elements.pollActions.querySelectorAll(".poll-option");
-  buttons.forEach((button) => {
-    const isSelected = button.dataset.option === savedVote;
+  var buttons = elements.pollActions.querySelectorAll(".poll-option");
+  buttons.forEach(function (button) {
+    var isSelected = button.dataset.option === savedVote;
     button.disabled = Boolean(savedVote);
     button.classList.toggle("is-selected", isSelected);
   });
 }
 
+function listenToPoll() {
+  getPollRef().on("value", function (snapshot) {
+    var data = snapshot.val() || { yes: 0, no: 0, unsure: 0 };
+    renderPollWithData(data);
+  });
+}
+
 function handlePollVote(event) {
-  const selectedOption = event.target.closest(".poll-option");
+  var selectedOption = event.target.closest(".poll-option");
   if (!selectedOption || getSavedVote()) {
     return;
   }
 
-  const choice = selectedOption.dataset.option;
-  const results = getStoredResults();
-  results[choice] = (results[choice] || 0) + 1;
+  var choice = selectedOption.dataset.option;
 
-  saveResults(results);
+  /* Atomic increment via transaction */
+  firebaseDb.ref("poll/" + choice).transaction(function (current) {
+    return (current || 0) + 1;
+  });
+
+  /* Mark vote locally so user can only vote once */
   window.localStorage.setItem(pollState.voteKey, choice);
-  renderPoll();
+
+  /* Immediately disable buttons (Firebase listener will update results) */
+  var buttons = elements.pollActions.querySelectorAll(".poll-option");
+  buttons.forEach(function (button) {
+    button.disabled = true;
+    button.classList.toggle("is-selected", button.dataset.option === choice);
+  });
 }
 
+/* ── Init ── */
 function init() {
+  initFirebase();
   setDeadlineMeta();
   setLastUpdated();
   renderUpdates();
   renderTimeline();
-  renderPoll();
+  listenToPoll();
   updateCountdown();
 
   window.setInterval(updateCountdown, 1000);
